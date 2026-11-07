@@ -1,4 +1,4 @@
-﻿using AplicacaoBackAula.DTO;
+using AplicacaoBackAula.DTO;
 using AplicacaoBackAula.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -86,100 +86,112 @@ namespace AplicacaoBackAula.Controllers
 
             return Ok(funcionario);
         }
-
         [HttpPost]
-        public async Task<ActionResult<FuncionariosDTO>> Post(FuncionariosDTO dto)
+        public async Task<ActionResult> Post(FuncionariosDTO dto)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-               
-                var funcionario = new Funcionario
-                {
-                    Idpessoa = dto.IdPessoa,
-                    Cargo = dto.Cargo,
-                    DataAdmissao = (DateOnly)dto.DataAdmissao
-                                    
-                };
-                _context.Funcionarios.Add(funcionario);
-                await _context.SaveChangesAsync();
+                var pDto = dto.Pessoas?.FirstOrDefault();
+                if (pDto == null)
+                    return BadRequest(new { mensagem = "Dados da pessoa não informados." });
 
                 var pessoa = new Pessoa
                 {
-                    Idpessoa = dto.IdPessoa,
-                    Nome = dto.Pessoas?.FirstOrDefault()?.Nome,
-                    Cpf = (long)dto.Pessoas?.FirstOrDefault()?.CPF,
-                    DataNascimento = (DateOnly)dto.Pessoas?.FirstOrDefault()?.DataNascimento,
-                    Sexo = dto.Pessoas?.FirstOrDefault()?.Sexo,
-                    Email = dto.Pessoas?.FirstOrDefault()?.Email,
-                    Telefone = (long)dto.Pessoas?.FirstOrDefault()?.Telefone,
-                    AtivoPessoa = dto.Pessoas?.FirstOrDefault()?.AtivoPessoa,
-                    Enderecos = dto.Pessoas?.FirstOrDefault()?.Enderecos?.Select(e => new Endereco
+                    Nome = pDto.Nome,
+                    Cpf = (long)pDto.CPF,
+                    DataNascimento = pDto.DataNascimento,
+                    Sexo = pDto.Sexo,
+                    Email = pDto.Email,
+                    Telefone = (long)pDto.Telefone,
+                    AtivoPessoa = pDto.AtivoPessoa,
+                    Enderecos = pDto.Enderecos?.Select(e => new Endereco
                     {
-                        Idpessoa = e.IdPessoa,
                         Cep = e.CEP,
                         Numero = e.Numero,
                         Complemento = e.Complemento
-                    }).ToList()
+                    }).ToList() ?? new List<Endereco>()
                 };
-
                 _context.Pessoas.Add(pessoa);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();          // gera o Idpessoa
 
+                var funcionario = new Funcionario
+                {
+                    Idpessoa = pessoa.Idpessoa,             // usa o id gerado
+                    Cargo = dto.Cargo,
+                    DataAdmissao = (DateOnly)dto.DataAdmissao
+                };
+                _context.Funcionarios.Add(funcionario);
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return Ok(funcionario);
-                
+                return CreatedAtAction(nameof(GetFuncionario),
+                    new { id = funcionario.Idpessoa },
+                    new { idPessoa = funcionario.Idpessoa, cargo = funcionario.Cargo });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return StatusCode(500, new { mensagem = "ERRO AO CADASTRAR FUNCIONÁRIO!", erro = ex.Message });
+                return StatusCode(500, new { mensagem = "ERRO AO CADASTRAR FUNCIONÁRIO!", erro = ex.InnerException?.Message ?? ex.Message });
             }
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<FuncionariosDTO>> Put(int id, FuncionariosDTO dto)
+        public async Task<ActionResult> Put(int id, FuncionariosDTO dto)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var funcionario = await _context.Funcionarios.FindAsync(id);
-                if (funcionario == null)
-                {
-                    return NotFound(new { mensagem = "FUNCIONÁRIO NÃO LOCALIZADO!!!!!!!" });
-                }
+                var funcionario = await _context.Funcionarios
+                    .Include(f => f.IdpessoaNavigation)
+                        .ThenInclude(p => p.Enderecos)
+                    .FirstOrDefaultAsync(f => f.Idpessoa == id);
 
-                funcionario.Idpessoa = dto.IdPessoa;
+                if (funcionario == null)
+                    return NotFound(new { mensagem = "FUNCIONÁRIO NÃO LOCALIZADO!" });
+
+                var pDto = dto.Pessoas?.FirstOrDefault();
+                if (pDto == null)
+                    return BadRequest(new { mensagem = "Dados da pessoa não informados." });
+
                 funcionario.Cargo = dto.Cargo;
                 funcionario.DataAdmissao = (DateOnly)dto.DataAdmissao;
 
-                funcionario.IdpessoaNavigation.Nome = dto.Pessoas?.FirstOrDefault()?.Nome;
-                funcionario.IdpessoaNavigation.Cpf = (long)dto.Pessoas?.FirstOrDefault()?.CPF;
-                funcionario.IdpessoaNavigation.DataNascimento = (DateOnly)(dto.Pessoas?.FirstOrDefault()?.DataNascimento);
-                funcionario.IdpessoaNavigation.Sexo = dto.Pessoas?.FirstOrDefault()?.Sexo;
-                funcionario.IdpessoaNavigation.Email = dto.Pessoas?.FirstOrDefault()?.Email;
-                funcionario.IdpessoaNavigation.Telefone = (long)dto.Pessoas?.FirstOrDefault()?.Telefone;
-                funcionario.IdpessoaNavigation.AtivoPessoa = dto.Pessoas?.FirstOrDefault()?.AtivoPessoa;
+                var pessoa = funcionario.IdpessoaNavigation;
+                pessoa.Nome = pDto.Nome;
+                pessoa.Cpf = (long)pDto.CPF;
+                pessoa.DataNascimento = pDto.DataNascimento;
+                pessoa.Sexo = pDto.Sexo;
+                pessoa.Email = pDto.Email;
+                pessoa.Telefone = (long)pDto.Telefone;
+                pessoa.AtivoPessoa = pDto.AtivoPessoa;
 
-                funcionario.IdpessoaNavigation.Enderecos = dto.Pessoas?.FirstOrDefault()?.Enderecos?.Select(e => new Endereco
+                var endDto = pDto.Enderecos?.FirstOrDefault();
+                if (endDto != null)
                 {
-                    Idpessoa = e.IdPessoa,
-                    Cep = e.CEP,
-                    Numero = e.Numero,
-                    Complemento = e.Complemento
-                }).ToList();
+                    var end = pessoa.Enderecos.FirstOrDefault();
+                    if (end == null)
+                    {
+                        pessoa.Enderecos.Add(new Endereco
+                        {
+                            Cep = endDto.CEP,
+                            Numero = endDto.Numero,
+                            Complemento = endDto.Complemento
+                        });
+                    }
+                    else
+                    {
+                        end.Cep = endDto.CEP;
+                        end.Numero = endDto.Numero;
+                        end.Complemento = endDto.Complemento;
+                    }
+                }
 
-                _context.Entry(funcionario).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return Ok(funcionario);
+                return NoContent();                 // não devolve a entidade (evita o ciclo)
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                return StatusCode(500, new { mensagem = "ERRO AO ATUALIZAR FUNCIONÁRIO!", erro = ex.Message });
+                return StatusCode(500, new { mensagem = "ERRO AO ATUALIZAR FUNCIONÁRIO!", erro = ex.InnerException?.Message ?? ex.Message });
             }
         }
 
