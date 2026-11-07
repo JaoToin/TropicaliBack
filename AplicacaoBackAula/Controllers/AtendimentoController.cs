@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AplicacaoBackAula.DTO;
 using AplicacaoBackAula.Models;
@@ -105,10 +105,10 @@ namespace AplicacaoBackAula.Controllers
         {
             var pessoa = await _context.Pessoas.FirstOrDefaultAsync(p => p.Idpessoa == dto.IdPessoa);
 
-            if ( pessoa == null)
+            if (pessoa == null)
             {
                 return BadRequest(NotFound(new { mensagem = "Pessoa Não Localizada!!!!!!!!!!!!!!!!!" }));
-
+                        
             }
 
             var atendimento = new Atendimento
@@ -116,7 +116,8 @@ namespace AplicacaoBackAula.Controllers
                 Idpessoa = dto.IdPessoa,
                 DataAtendimento = dto.DataAtendimento,
                 StatusAtendimento = dto.StatusAtendimento,
-                               
+                
+
                 Atendimentoitems = dto.Itens.Select(i => new Atendimentoitem
                 {
                     Iditem = i.IdItem,
@@ -133,11 +134,10 @@ namespace AplicacaoBackAula.Controllers
 
             // Criação do DTO de resposta
             return CreatedAtAction(nameof(GetAtendimento),
-                new {id = atendimento.Idatendimento}, dto);
+                new { id = atendimento.Idatendimento }, dto);
         }// fim do método PostAtendimento
 
         [HttpPut("{id}")]
-
         public async Task<ActionResult> PutAtendimento(int id, AtendimentoPutDTO dto)
         {
 
@@ -161,8 +161,8 @@ namespace AplicacaoBackAula.Controllers
 
             //percorrendo os itens vindos dos dto 
             foreach (var itemDTO in dto.Itens)
-            { 
-                 // buscar do banco de dados os itens do atendimento passado por parametros 
+            {
+                // buscar do banco de dados os itens do atendimento passado por parametros 
                 var itemExistente = atendimento.Atendimentoitems.FirstOrDefault(i => i.Iditem == itemDTO.IdItem &&
                 i.Idfuncionario == itemDTO.IdFuncionario);
 
@@ -190,9 +190,26 @@ namespace AplicacaoBackAula.Controllers
 
             //não retornara nada !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             return NoContent();
-        } // fim putatendimento
+        }
 
         [HttpDelete("{id}")]
+        
+        public async Task<ActionResult> DeleteAtendimento(int id)
+        {
+            var atendimento = await _context.Atendimentos.Include(a => a.Atendimentoitems).FirstOrDefaultAsync(a => a.Idatendimento == id);
+            if (atendimento == null)
+            {
+                return NotFound(new { mensagem = "Atendimento Não Localizado!!!!!!!!!!!!!!!!!!!" });
+            }
+
+
+            // excluir os itens do atendimento na tabela atendimento 
+            _context.Atendimentoitems.RemoveRange(atendimento.Atendimentoitems);
+            _context.Atendimentos.Remove(atendimento);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
 
 
 
