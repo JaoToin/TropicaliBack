@@ -1,115 +1,107 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using AplicacaoBackAula.DTO;
 using AplicacaoBackAula.Models;
 
 namespace AplicacaoBackAula.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-
-    //definir a rota do controller e o tipo de controller
-    public class CategoriaController : ControllerBase
+    [ApiController]
+    public class Categoriums1Controller : ControllerBase
     {
-        // criar a variavel de contexto do banco de dados
         private readonly BdAulaBackendContext _context;
 
-        // criar o construtor da classe para injetar o contexto do banco de dados
-        public CategoriaController(BdAulaBackendContext context)
+        public Categoriums1Controller(BdAulaBackendContext context)
         {
-            // injetar o contexto do banco de dados
             _context = context;
         }
 
+        // GET: api/Categoriums1
         [HttpGet]
-
-        public async Task<ActionResult<IEnumerable<CategoriaDTO>>> GetAll()
+        public async Task<ActionResult<IEnumerable<Categorium>>> GetCategoria()
         {
-            var categorias = await _context.Categoria.Select(c => new CategoriaDTO
-            {
-                
-                Categoria = c.Categoria,
-                Produtos = c.Items.Select(p => new ProdutoDTO
-                {
-                  IdCategoria = p.Idcategoria,
-                   Item = p.Item1,
-                    DescricaoItem = p.DescricaoItem,
-                    Preco = p.Preco,
-                    TipoItem = p.TipoItem,
-                    AtivoProdutoServico = p.AtivoProdutoServico
-                }).ToList()
-            }).ToListAsync();
-            return Ok(categorias);
-        } // fim metodo getAll
+            return await _context.Categoria.ToListAsync();
+        }
 
+        // GET: api/Categoriums1/5
         [HttpGet("{id}")]
-
-        public async Task<ActionResult<CategoriaDTO>> GetCategoria(int id)
+        public async Task<ActionResult<Categorium>> GetCategorium(int id)
         {
-            var categoria = await _context.Categoria.Where(c => c.Idcategoria == id)            
-                .Select(c => new CategoriaDTO
-                {
-                    Categoria = c.Categoria,
-                    Produtos = c.Items.Select(p => new ProdutoDTO
-                    {
-                        IdCategoria = p.Idcategoria,
-                        Item = p.Item1,
-                        DescricaoItem = p.DescricaoItem,
-                        Preco = p.Preco,
-                        TipoItem = p.TipoItem,
-                        AtivoProdutoServico = p.AtivoProdutoServico
-                    }).ToList()
+            var categorium = await _context.Categoria.FindAsync(id);
 
-                }).ToListAsync();       
-            return Ok(categoria);
-        } // fim metodo getCategoria
-
-        [HttpPost]
-
-        public async Task<ActionResult<CategoriaDTO>> Post(CategoriaDTO dto)
-        {
-            var categoria = new Categorium
+            if (categorium == null)
             {
-                Categoria = dto.Categoria
-            };
-            _context.Categoria.Add(categoria);
-            await _context.SaveChangesAsync();
+                return NotFound();
+            }
 
-            var resposta = new CategoriaDTO
-            {
-                Categoria = categoria.Categoria,
-                Produtos = new List<ProdutoDTO>()
-            };
+            return categorium;
+        }
 
-            return CreatedAtAction(nameof(GetCategoria), new { id = categoria.Idcategoria }, resposta);
-        } // fim metodo createCategoria
-
+        // PUT: api/Categoriums1/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-
-        public async Task<ActionResult> Put(int id, CategoriaDTO dto)
+        public async Task<IActionResult> PutCategorium(int id, Categorium categorium)
         {
-            var categoria = await _context.Categoria.FindAsync(id);
-            if (categoria == null)
+            if (id != categorium.Idcategoria)
             {
-                return NotFound();
+                return BadRequest();
             }
-            categoria.Categoria = dto.Categoria;
-            await _context.SaveChangesAsync();
-            return NoContent();
-        } // fim metodo updateCategoria
 
+            _context.Entry(categorium).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!CategoriumExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // POST: api/Categoriums1
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPost]
+        public async Task<ActionResult<Categorium>> PostCategorium(Categorium categorium)
+        {
+            _context.Categoria.Add(categorium);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction("GetCategorium", new { id = categorium.Idcategoria }, categorium);
+        }
+
+        // DELETE: api/Categoriums1/5
         [HttpDelete("{id}")]
-
-        public async Task<ActionResult<Categorium>> Delete(int id)
+        public async Task<IActionResult> DeleteCategorium(int id)
         {
-            var categoria = await _context.Categoria.FindAsync(id);
-            if (categoria == null)
+            var categorium = await _context.Categoria.FindAsync(id);
+            if (categorium == null)
             {
                 return NotFound();
             }
-            _context.Categoria.Remove(categoria);
+
+            _context.Categoria.Remove(categorium);
             await _context.SaveChangesAsync();
+
             return NoContent();
-        } // fim metodo deleteCategoria
+        }
+
+        private bool CategoriumExists(int id)
+        {
+            return _context.Categoria.Any(e => e.Idcategoria == id);
+        }
     }
 }
