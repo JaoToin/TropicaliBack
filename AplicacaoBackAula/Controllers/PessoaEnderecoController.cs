@@ -1,32 +1,25 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AplicacaoBackAula.DTO;
 using AplicacaoBackAula.Models;
 
 namespace AplicacaoBackAula.Controllers
 {
-    //ANOTAÇÕES DE IDENTIFICAÇÃO DE CONTROLLER
     [ApiController]
     [Route("api/[controller]")]
     public class PessoaEnderecoController : ControllerBase
     {
-        //DECLARAÇÃO DO ATRIBUTO DE CONTEXTO
         private readonly BdAulaBackendContext _context;
 
-        //DECLARAÇÃO DO MÉTODO CONSTRUTOR
         public PessoaEnderecoController(BdAulaBackendContext context)
         {
-            //INSTANCIA DO ATRIBUTO CONSTRUTOR
             _context = context;
         }
 
-        //DECLARAÇÃO DO MÉTODO PARA LISTAR TODAS AS PESSOAS E SEUS ENDEREÇOS
+        // LISTAR TODAS AS PESSOAS E SEUS ENDEREÇOS
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PessoaDTO>>> GetAll()
         {
-            Pessoa p = new Pessoa();
-
-
             var pessoas = await _context.Pessoas
                 .Select(p => new PessoaDTO
                 {
@@ -45,208 +38,194 @@ namespace AplicacaoBackAula.Controllers
                         IdPessoa = e.Idpessoa,
                         CEP = e.Cep,
                         Numero = e.Numero,
-                        Complemento = e.Complemento,
-
+                        Complemento = e.Complemento
                     }).ToList()
-
                 }).ToListAsync();
 
             return Ok(pessoas);
+        }
 
-        }//FIM MÉTODO GetAll
-
-        //DECLARAÇÃO DO MÉTODO PARA LISTAR UMA A PESSOA E SEUS ENDEREÇOS
+        // LISTAR UMA PESSOA (devolve UM objeto, e não uma lista)
         [HttpGet("{id}")]
         public async Task<ActionResult<PessoaDTO>> GetPessoa(int id)
         {
             var pessoa = await _context.Pessoas
                 .Where(p => p.Idpessoa == id)
-               .Select(p => new PessoaDTO
-               {
+                .Select(p => new PessoaDTO
+                {
+                    IdPessoa = p.Idpessoa,
+                    Nome = p.Nome,
+                    CPF = (long)p.Cpf,
+                    DataNascimento = p.DataNascimento,
+                    Sexo = p.Sexo,
+                    Email = p.Email,
+                    Telefone = (long)p.Telefone,
+                    AtivoPessoa = p.AtivoPessoa,
 
-                   IdPessoa = p.Idpessoa,
-                   Nome = p.Nome,
-                   CPF = (long)p.Cpf,
-                   DataNascimento = p.DataNascimento,
-                   Sexo = p.Sexo,
-                   Email = p.Email,
-                   Telefone = (long)p.Telefone,
-                   AtivoPessoa = p.AtivoPessoa,
+                    Enderecos = p.Enderecos.Select(e => new EnderecoDTO
+                    {
+                        IdEndereco = e.Idendereco,
+                        IdPessoa = e.Idpessoa,
+                        CEP = e.Cep,
+                        Numero = e.Numero,
+                        Complemento = e.Complemento
+                    }).ToList()
+                }).FirstOrDefaultAsync();
 
-                   Enderecos = p.Enderecos.Select(e => new EnderecoDTO
-                   {
-                       IdEndereco = e.Idendereco,
-                       IdPessoa = e.Idpessoa,
-                       CEP = e.Cep,
-                       Numero = e.Numero,
-                       Complemento = e.Complemento,
-
-                   }).ToList()
-
-               }).ToListAsync();
+            if (pessoa == null)
+            {
+                return NotFound(new { mensagem = "Pessoa não localizada!" });
+            }
 
             return Ok(pessoa);
+        }
 
-        }//FIM MÉTODO GetPEssoa
-
-        //MÉTODO PARA CADASTRAR UMA PESSOA
+        // CADASTRAR
         [HttpPost]
-        public async Task<ActionResult<PessoaDTO>> Post(PessoaDTO dto)
+        public async Task<ActionResult> Post(PessoaDTO dto)
         {
-            var pessoa = new Pessoa
+            try
             {
-                Nome = dto.Nome,
-                Cpf = (long)dto.CPF,
-                DataNascimento = dto.DataNascimento,
-                Sexo = dto.Sexo,
-                Email = dto.Email,
-                Telefone = (long)dto.Telefone,
-                AtivoPessoa = dto.AtivoPessoa,
-
-                Enderecos = dto.Enderecos.Select(e => new Endereco
+                var pessoa = new Pessoa
                 {
-                    Cep = e.CEP,
-                    Numero = e.Numero,
-                    Complemento = e.Complemento
-                }).ToList()
-            };
+                    Nome = dto.Nome,
+                    Cpf = (long)dto.CPF,
+                    DataNascimento = dto.DataNascimento,
+                    Sexo = dto.Sexo,
+                    Email = dto.Email,
+                    Telefone = (long)dto.Telefone,
+                    AtivoPessoa = dto.AtivoPessoa,
 
-            _context.Pessoas.Add(pessoa);
+                    Enderecos = dto.Enderecos?.Select(e => new Endereco
+                    {
+                        Cep = e.CEP,
+                        Numero = e.Numero,
+                        Complemento = e.Complemento
+                    }).ToList() ?? new List<Endereco>()
+                };
 
-            await _context.SaveChangesAsync();
+                _context.Pessoas.Add(pessoa);
+                await _context.SaveChangesAsync();
 
-            var resposta = new PessoaDTO
+                return CreatedAtAction(nameof(GetPessoa),
+                    new { id = pessoa.Idpessoa },
+                    new { idPessoa = pessoa.Idpessoa });
+            }
+            catch (Exception ex)
             {
-                IdPessoa = pessoa.Idpessoa,
-                Nome = pessoa.Nome,
-                CPF = pessoa.Cpf,
-                DataNascimento = pessoa.DataNascimento,
-                Sexo = pessoa.Sexo,
-                Email = pessoa.Email,
-                Telefone = pessoa.Telefone,
-                AtivoPessoa = pessoa.AtivoPessoa,
-
-                Enderecos = pessoa.Enderecos.Select(e => new EnderecoDTO
+                return StatusCode(500, new
                 {
-                    CEP = e.Cep,
-                    Numero = e.Numero,
-                    Complemento = e.Complemento
-                }).ToList()
+                    mensagem = "Erro ao cadastrar pessoa.",
+                    erro = ex.InnerException?.Message ?? ex.Message
+                });
+            }
+        }
 
-            };
-
-            return CreatedAtAction(
-                nameof(GetPessoa),
-                new { id = pessoa.Idpessoa },
-                resposta);
-
-        }//FIM MÉTODO Post
-
-
-        //MÉTODO PARA ALTERAR UMA PESSOA
+        // ALTERAR
         [HttpPut("{id}")]
-        public async Task<ActionResult<ActionResult<Pessoa>>> Put(int id, PessoaDTO dto)
+        public async Task<ActionResult> Put(int id, PessoaDTO dto)
         {
-            //BUSCA A PESSOA E SEUS ENDEREÇOS E ATRIBUI A VARIÁVEL PESSOA
-            var pessoa = await _context.Pessoas
-                .Include(p => p.Enderecos)
-                .FirstOrDefaultAsync(p => p.Idpessoa == id);
-
-            //VERIFICA SE A PESSOA EXISTE
-            if (pessoa == null)
+            try
             {
-                return NotFound();
-            }
+                var pessoa = await _context.Pessoas
+                    .Include(p => p.Enderecos)
+                    .FirstOrDefaultAsync(p => p.Idpessoa == id);
 
-            //PROJETA OS DADOS DO PessoaDTO PARA O MODELO Pessoa ORIUNDA DO BANCO DE DADOS
-            pessoa.Nome = dto.Nome;
-            pessoa.Cpf = (long)dto.CPF;
-            pessoa.DataNascimento = dto.DataNascimento;
-            pessoa.Sexo = dto.Sexo;
-            pessoa.Email = dto.Email;
-            pessoa.Telefone = (long)dto.Telefone;
-            pessoa.AtivoPessoa = dto.AtivoPessoa;
-
-            // Guarda os IDs dos endereços recebidos
-            var idsRecebidos = dto.Enderecos
-                .Where(e => e.IdEndereco.HasValue)
-                .Select(e => e.IdEndereco!.Value)
-                .ToHashSet();
-
-            // Identifica os endereços existentes que devem ser removidos
-            var enderecosRemover = pessoa.Enderecos
-                .Where(e => !idsRecebidos.Contains(e.Idendereco))
-                .ToList();
-
-            // Remove apenas os endereços que já existiam no banco
-            _context.Enderecos.RemoveRange(enderecosRemover);
-
-            //PERCORRE OS ENDEREÇOS DA PESSOA
-            foreach (var endPessoa in dto.Enderecos)
-            {
-                //VERIFICA SE O ID EXISTE COM A PESSOA
-                if (endPessoa.IdEndereco != null)
+                if (pessoa == null)
                 {
-                    //BUSCA O ENDERECO DA PESSOA, NO ATRIBUTO DO MODELO Pessoa.
-                    var endereco = pessoa.Enderecos
-                        .FirstOrDefault(e => e.Idendereco == endPessoa.IdEndereco);
+                    return NotFound(new { mensagem = "Pessoa não localizada!" });
+                }
 
-                    //CASO NÃO ENCONTRE EMITE UMA MENSAGEM DE QUE O ENDEREÇO NÃO PERTECE A ESSA PESSOA.
-                    if (endereco == null)
+                pessoa.Nome = dto.Nome;
+                pessoa.Cpf = (long)dto.CPF;
+                pessoa.DataNascimento = dto.DataNascimento;
+                pessoa.Sexo = dto.Sexo;
+                pessoa.Email = dto.Email;
+                pessoa.Telefone = (long)dto.Telefone;
+                pessoa.AtivoPessoa = dto.AtivoPessoa;
+
+                var enderecosDto = dto.Enderecos ?? new List<EnderecoDTO>();
+
+                // ids dos endereços recebidos
+                var idsRecebidos = enderecosDto
+                    .Where(e => e.IdEndereco.HasValue)
+                    .Select(e => e.IdEndereco!.Value)
+                    .ToHashSet();
+
+                // endereços existentes que não vieram no corpo serão removidos
+                var enderecosRemover = pessoa.Enderecos
+                    .Where(e => !idsRecebidos.Contains(e.Idendereco))
+                    .ToList();
+
+                _context.Enderecos.RemoveRange(enderecosRemover);
+
+                foreach (var endPessoa in enderecosDto)
+                {
+                    if (endPessoa.IdEndereco.HasValue)
                     {
-                        return BadRequest($"O endereço não pertece a essa pessoa");
+                        var endereco = pessoa.Enderecos
+                            .FirstOrDefault(e => e.Idendereco == endPessoa.IdEndereco.Value);
+
+                        if (endereco == null)
+                        {
+                            return BadRequest(new { mensagem = "O endereço não pertence a essa pessoa." });
+                        }
+
+                        endereco.Numero = endPessoa.Numero;
+                        endereco.Cep = endPessoa.CEP;
+                        endereco.Complemento = endPessoa.Complemento;
                     }
-
-                    //AO LOCALIZAR PROJETA NO MODELO Endereco OS DADOS VINDO DO ATRIBUTO Endereços
-                    //DO MODELO O PESSOA QUE VENHO DO PessoaDto
-                    endereco.Numero = endPessoa.Numero;
-                    endereco.Cep = endPessoa.CEP;
-                    endereco.Complemento = endPessoa.Complemento;
-                }
-                else
-                {
-                    //CASO O ID NÃO SEJA MAIOR QUE 0(ZERO) É UM NOVO ENDEREÇO A SER ADICIONADO A PESSOA
-                    pessoa.Enderecos.Add(new Endereco
+                    else
                     {
-                        Numero = endPessoa.Numero,
-                        Cep = endPessoa.CEP,
-                        Complemento = endPessoa.Complemento
-
-                    });
+                        pessoa.Enderecos.Add(new Endereco
+                        {
+                            Numero = endPessoa.Numero,
+                            Cep = endPessoa.CEP,
+                            Complemento = endPessoa.Complemento
+                        });
+                    }
                 }
+
+                await _context.SaveChangesAsync();
+                return NoContent();
             }
-
-
-            //SALVA NO BANCO DE DAOS
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        //MÉTODO PARA EXCLUIR UMA PESSOA
-        [HttpDelete("{id}")]
-        public async Task<ActionResult<Pessoa>> Delete(int id)
-        {
-            //BUSCA A PESSOA E SEUS ENDEREÇOS E ATRIBUI A VARIÁVEL PESSOA
-            var pessoa = await _context.Pessoas
-                .Include(p => p.Enderecos)
-                .FirstOrDefaultAsync(p => p.Idpessoa == id);
-
-            //VERIFICA SE A PESSOA EXISTE
-            if (pessoa == null)
+            catch (Exception ex)
             {
-                return NotFound();
+                return StatusCode(500, new
+                {
+                    mensagem = "Erro ao atualizar pessoa.",
+                    erro = ex.InnerException?.Message ?? ex.Message
+                });
             }
-
-            //PREPARA A INSTRUÇÃO PARA EXECUTAR NO BANCO DE DADOS
-            _context.Pessoas.Remove(pessoa);
-
-            //SALVA NO BANCO DE DAOS
-            await _context.SaveChangesAsync();
-
-            return NoContent();
         }
 
+        // EXCLUIR
+        [HttpDelete("{id}")]
+        public async Task<ActionResult> Delete(int id)
+        {
+            try
+            {
+                var pessoa = await _context.Pessoas
+                    .Include(p => p.Enderecos)
+                    .FirstOrDefaultAsync(p => p.Idpessoa == id);
 
-    }//FIM DA CLASSE CONTROLLER PessoaEnderecoContoller
-}//FIM DO NAMESPACE
+                if (pessoa == null)
+                {
+                    return NotFound(new { mensagem = "Pessoa não localizada!" });
+                }
+
+                _context.Pessoas.Remove(pessoa);
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return Conflict(new
+                {
+                    mensagem = "Não foi possível excluir. A pessoa pode ter atendimentos ou cadastro de funcionário vinculados.",
+                    erro = ex.InnerException?.Message ?? ex.Message
+                });
+            }
+        }
+    }
+}
