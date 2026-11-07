@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace AplicacaoBackAula.Models;
@@ -7,7 +7,7 @@ public partial class Produto
 {
     public int Iditem { get; set; }
 
-    public int CodigoPreco { get; set; }
+    public string CodigoPreco { get; set; }
 
     public decimal PrecoVenda { get; set; }
 
@@ -17,3 +17,4 @@ public partial class Produto
 
     public virtual Item IditemNavigation { get; set; } = null!;
 }
+
